@@ -1,6 +1,8 @@
-**Digital Twin**
+**foulaBean**
 
-The Hardware Simulation Platform is an open-source, cross-platform desktop application designed to simulate various devices and protocols. The platform aims to provide a user-friendly interface for developers to create, test, and integrate custom device models with minimal overhead.
+foulaBean is an open-source electro-mechanical machine simulation platform — a cross-platform desktop application for creating digital twins to simulate devices and protocols. The platform provides a user-friendly interface for developers to build, test, and integrate custom device models with minimal overhead.
+ 
+**Foula divided into two** 🌱 **فولة و تقسمت على إثنين**  
 
 Architecture :
 
