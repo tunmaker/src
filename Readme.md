@@ -35,3 +35,5 @@ foulaBean is awork in progress to create an open-source electro-mechanical machi
 ## Build notes:
 - need [libzmq](githttps://github.com/zeromq/libzmq.git) 
     - with cppzmq C++ binding for libzmq from vcpkg [instructions](https://github.com/zeromq/cppzmq?tab=readme-ov-file#build-instructions)
+
+run renode then call emulation CreateExternalControlServer "servezmq" 5555 
