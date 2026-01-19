@@ -22,11 +22,7 @@ int main(int argc, char *argv[])
 
     // Example: activate GetTime (id 0x01 v0x01) and ADC (id 0x02 v0x01).
     // Replace ids/versions with real ones from server ICommand classes.
-    if(!client.handshake_activate({ {0x01, 0x00}, {0x02, 0x00} })) {
-        std::cerr << "Handshake failed or empty response." << std::endl;
-        return 1;
-    }
-    std::cout << "Handshake complete." << std::endl;
+    client.init();
 
     // Example: GetTime (no payload)
     {

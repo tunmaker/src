@@ -97,8 +97,14 @@ ExternalControlClient::~ExternalControlClient() {
   }
 }
 
-
-
+bool ExternalControlClient::init(){
+    if(!this->handshake_activate(command_versions)) {
+        std::cerr << "Handshake failed or empty response." << '\n';
+        return true;
+    }
+    std::cout << "Handshake complete." << '\n';
+    return false;;
+}
 
 // helper to read one byte, returning true on success
 static bool read_byte(int fd, uint8_t &out) {
@@ -247,7 +253,7 @@ ExternalControlClient::recv_response(uint8_t expected_command) {
     // For simplicity, treat async event as error here
     throw std::runtime_error("recv_response: unexpected async event");
   default:
-    throw std::runtime_error("recv_response: unexpected return code");
+    std::cerr << ("recv_response: unexpected return code ") << return_code;
   }
 
   // Validate echoed command if requested
