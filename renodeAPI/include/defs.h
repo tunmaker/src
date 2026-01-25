@@ -1,26 +1,33 @@
 #pragma once
+
 #include <stdint.h>
 #include <string>
+#include <array>
+#include <vector>
+#include <netdb.h>
 
 #define SERVER_START_COMMAND "emulation CreateExternalControlServer \"NAME\" PORT"
 
-// --------------------------------------------------------------------
-//  Hand‑shake constants (adjust if your server uses different IDs)
-// --------------------------------------------------------------------
-static const uint8_t HANDSHAKE_CMD_ID = 0x00;          // command ID for version exchange
-static const uint8_t SUCCESS_HANDSHAKE = 0xAA ;        // expected reply byte
-
-typedef enum {
+enum class api_commands : int8_t {
     ANY_COMMAND = 0,
     RUN_FOR = 1,
-    GET_TIME,
-    GET_MACHINE,
-    ADC,
-    GPIO,
-    SYSTEM_BUS,
-    EVENT = -1,
-} api_commands;
+    GET_TIME = 2,
+    GET_MACHINE = 3,
+    ADC = 4,
+    GPIO = 5,
+    SYSTEM_BUS = 6,
+    EVENT = -1
+};
 
+// constexpr fixed-size container with pairs of (command, version)
+constexpr std::array<std::pair<uint8_t, uint8_t>, 6> command_versions{{
+    { static_cast<uint8_t>(api_commands::RUN_FOR),     0x0 }, // 1
+    { static_cast<uint8_t>(api_commands::GET_TIME),    0x0 }, // 2
+    { static_cast<uint8_t>(api_commands::GET_MACHINE), 0x0 }, // 3
+    { static_cast<uint8_t>(api_commands::ADC),         0x0 }, // 4
+    { static_cast<uint8_t>(api_commands::GPIO),        0x1 }, // 5
+    { static_cast<uint8_t>(api_commands::SYSTEM_BUS),  0x0 }  // 6
+}};
 
 /* Simple error enum – mirrors the original renode_error_t API */
 enum class RenodeError {
@@ -29,7 +36,7 @@ enum class RenodeError {
     Fatal
 };
 
-enum return_code_t {
+enum renode_return_code {
   COMMAND_FAILED,       // code, command, data
   FATAL_ERROR,          // code, data
   INVALID_COMMAND,      // code, command
@@ -75,3 +82,44 @@ enum renode_access_width {
     AW_DOUBLE_WORD = 4,
     AW_QUAD_WORD   = 8,
 };
+
+// Helpers to write little-endian
+static void write_u16_le(std::vector<uint8_t> &buf, uint16_t v) {
+  buf.push_back(uint8_t(v & 0xFF));
+  buf.push_back(uint8_t((v >> 8) & 0xFF));
+}
+static void write_u32_le(std::vector<uint8_t> &buf, uint32_t v) {
+  buf.push_back(uint8_t(v & 0xFF));
+  buf.push_back(uint8_t((v >> 8) & 0xFF));
+  buf.push_back(uint8_t((v >> 16) & 0xFF));
+  buf.push_back(uint8_t((v >> 24) & 0xFF));
+}
+
+// Full-send helper
+static bool write_all(int fd, const uint8_t *buf, size_t len) {
+  size_t sent = 0;
+  while (sent < len) {
+    ssize_t r = send(fd, buf + sent, len - sent, 0);
+    if (r <= 0)
+      return false;
+    sent += static_cast<size_t>(r);
+  }
+  return true;
+}
+
+// Full-read helper
+static bool read_all(int fd, uint8_t *buf, size_t len) {
+  size_t got = 0;
+  while (got < len) {
+    ssize_t r = recv(fd, buf + got, len - got, 0);
+    if (r <= 0)
+      return false;
+    got += static_cast<size_t>(r);
+  }
+  return true;
+}
+
+// helper to read one byte, returning true on success
+static bool read_byte(int fd, uint8_t &out) {
+    return read_all(fd, &out, 1);
+}
