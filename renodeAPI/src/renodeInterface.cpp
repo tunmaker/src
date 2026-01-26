@@ -16,6 +16,7 @@
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 namespace renode {
 
@@ -81,6 +82,7 @@ void ExternalControlClient::disconnect() noexcept {
   if (sock_fd_ >= 0) {
     close(sock_fd_);
     sock_fd_ = -1;
+    std::cout << "disconnected cleanly." << '\n';
   }
 }
 
@@ -121,7 +123,7 @@ bool ExternalControlClient::performHandshake() {
 // return them. expected_command is used to assert server echoed command (not
 // enforced if 0xFF)
 std::vector<uint8_t>
-ExternalControlClient::send_command(api_commands commandId,
+ExternalControlClient::send_command(ApiCommand commandId,
                                     const std::vector<uint8_t> &payload) {
   // Build 7-byte header: 'R','E', command, data_size (4 bytes LE)
   uint8_t header[7];
@@ -151,8 +153,7 @@ void ExternalControlClient::send_bytes(const uint8_t *data, size_t len) {
   }
 }
 
-std::vector<uint8_t>
-ExternalControlClient::recv_response(api_commands expected_command) {
+std::vector<uint8_t> ExternalControlClient::recv_response(ApiCommand expected_command) {
   if (sock_fd_ < 0)
     throw std::runtime_error("socket closed");
 
@@ -213,8 +214,8 @@ ExternalControlClient::recv_response(api_commands expected_command) {
   }
 
   // Validate echoed command if requested
-  if (expected_command != 0xFF && received_command != 0xFF &&
-      received_command != expected_command) {
+  if (received_command != 0xFF
+      && received_command != expected_command) {
     // If server returned INVALID_COMMAND, it sets return_code accordingly;
     // here we detect mismatches.
     throw std::runtime_error(
@@ -248,40 +249,66 @@ struct AMachine::Impl {
 
 AMachine::AMachine(std::unique_ptr<Impl> impl) noexcept
     : pimpl_(std::move(impl)) {}
+
 AMachine::~AMachine() = default;
+
 std::string AMachine::name() const noexcept {
   return pimpl_ ? pimpl_->name : std::string();
 }
 
-std::shared_ptr<AMachine>
-ExternalControlClient::getMachine(const std::string &name,
-                                  Error &err) noexcept {
+std::shared_ptr<AMachine> ExternalControlClient::getMachine(const std::string &name, Error &err) noexcept {
   std::lock_guard<std::mutex> lk(pimpl_->mtx);
   if (!pimpl_->connected) {
     err = {1, "Not connected"};
     return nullptr;
   }
 
-      uint32_t name_length = strlen(name);
-    uint32_t data_size = name_length + sizeof(int32_t);
-    int32_t *data __attribute__ ((__cleanup__(xcleanup))) = xmalloc(data_size);
+  std::vector<uint8_t> data;
+  uint32_t name_length = static_cast<uint32_t>(name.size());
+  data.reserve(sizeof(name_length) + name_length);
 
-    data[0] = name_length;
-    memcpy(data + 1, name, name_length);
+  // append length in little-endian
+  uint32_t le_len = name_length;
+  auto len_bytes = reinterpret_cast<const uint8_t*>(&le_len);
+  data.insert(data.end(), len_bytes, len_bytes + sizeof(le_len));
 
-    send_command( api_commands::GET_MACHINE, data);
+  // append name bytes
+  data.insert(data.end(), name.begin(), name.end());
 
+  // send command and get reply
+  std::vector<uint8_t> reply;
+  try {
+    reply = send_command(ApiCommand::GET_MACHINE, data);
+  } catch (const std::exception &ex) {
+    err = {2, std::string("send_command failed: ") + ex.what()};
+    return nullptr;
+  }
 
-  // In real code query server; here create on demand
-  auto existing = pimpl_->machines[name].lock();
-  if (existing) {
+  // Expect exactly 4 bytes (int32 descriptor)
+  if (reply.size() != sizeof(int32_t)) {
+    err = {3, "Unexpected reply size from GET_MACHINE"};
+    return nullptr;
+  }
+
+  int32_t descriptor = 0;
+  std::memcpy(&descriptor, reply.data(), sizeof(descriptor)); // assumes little-endian
+  // If you require network (big-endian) convert with ntohl here.
+
+  if (descriptor < 0) {
+    err = {4, "Machine not found"};
+    return nullptr;
+  }
+
+  // If already have a weak_ptr cached, return it
+  if (auto existing = pimpl_->machines[name].lock()) {
     err = {0, ""};
     return existing;
   }
 
+  // Create new local wrapper and store weak_ptr
   auto instImpl = std::make_unique<AMachine::Impl>(name, pimpl_.get());
-  auto inst = std::shared_ptr<AMachine>(
-      new AMachine(std::unique_ptr<AMachine::Impl>(instImpl.release())));
+  instImpl->name = descriptor; // store received descriptor if your Impl has such a field
+  auto inst = std::shared_ptr<AMachine>(new AMachine(std::move(instImpl)));
   pimpl_->machines[name] = inst;
   err = {0, ""};
   return inst;

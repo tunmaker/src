@@ -94,10 +94,10 @@ public:
 private:
   void send_bytes(const uint8_t *data, size_t len);
 
-  std::vector<uint8_t> recv_response(api_commands expected_command);
+  std::vector<uint8_t> recv_response(ApiCommand expected_command);
   // Send a command and receive the payload bytes (empty vector if none or on
   // error)
-  std::vector<uint8_t> send_command(api_commands commandId,
+  std::vector<uint8_t> send_command(ApiCommand commandId,
                                     const std::vector<uint8_t> &payload);
   static std::string bytes_to_string(const std::vector<uint8_t> &v);
 

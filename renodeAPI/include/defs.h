@@ -26,25 +26,25 @@ struct PeripheralDescriptor {
     std::map<std::string, std::string> metadata;
 };
 
-enum class api_commands : int8_t {
+typedef enum {
     ANY_COMMAND = 0,
     RUN_FOR = 1,
-    GET_TIME = 2,
-    GET_MACHINE = 3,
-    ADC = 4,
-    GPIO = 5,
-    SYSTEM_BUS = 6,
-    EVENT = -1
-};
+    GET_TIME,
+    GET_MACHINE,
+    ADC,
+    GPIO,
+    SYSTEM_BUS,
+    EVENT = -1,
+} ApiCommand;
 
 // constexpr fixed-size container with pairs of (command, version)
 constexpr std::array<std::pair<uint8_t, uint8_t>, 6> command_versions{{
-    { static_cast<uint8_t>(api_commands::RUN_FOR),     0x0 }, // 1
-    { static_cast<uint8_t>(api_commands::GET_TIME),    0x0 }, // 2
-    { static_cast<uint8_t>(api_commands::GET_MACHINE), 0x0 }, // 3
-    { static_cast<uint8_t>(api_commands::ADC),         0x0 }, // 4
-    { static_cast<uint8_t>(api_commands::GPIO),        0x1 }, // 5
-    { static_cast<uint8_t>(api_commands::SYSTEM_BUS),  0x0 }  // 6
+    { RUN_FOR,     0x0 }, // 1
+    { GET_TIME,    0x0 }, // 2
+    { GET_MACHINE, 0x0 }, // 3
+    { ADC,         0x0 }, // 4
+    { GPIO,        0x1 }, // 5
+    { SYSTEM_BUS,  0x0 }  // 6
 }};
 
 /* Simple error enum – mirrors the original renode_error_t API */

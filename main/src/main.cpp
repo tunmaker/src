@@ -28,6 +28,11 @@ int main(int argc, char *argv[]) {
     std::cout << "connection failed" << '\n';
   }
 
+  Error err;
+  renode->getMachine("test-machine", err);
+  std::cout << "code:" << err.code << ";message:" << err.message << '\n';
+
+
   /*
       // Example: GetTime (no payload)
       {
